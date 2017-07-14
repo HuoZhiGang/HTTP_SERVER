@@ -36,6 +36,7 @@ int http_startup(const char* ip, int port)
 	return listen_sock;
 }
 
+// read line form socket
 int http_getline(int sockfd, char *buf, int buf_length)
 {
 	char read_char = '\0';
@@ -68,24 +69,38 @@ int http_getline(int sockfd, char *buf, int buf_length)
 	return read_idx;
 }
 
+
+// 处理 客户端发来的请求
 void* http_handler_request(void* new_sock)
 {
-	int sockfd = (int)new_sock;
-	char read_buf[BUFSIZE];
-	int  read_length = 0;
 
-	read_length = http_getline(sockfd, read_buf, sizeof(read_buf));
+	int sockfd = (int)new_sock;
+	char read_buf[BUFSIZE]; 
+	int  read_length = 0;
+	int cgi = 0;
+	int state_code = 0;
 
 #ifdef _DEBUG_
 	printf("============================\n");
-	printf("GET LINE:\n%s\n", read_buf);
+	char debug_buf[BUFSIZE];
+	do
+	{
+		http_getline(sockfd, debug_buf, sizeof(debug_buf));
+		printf("%s",debug_buf);
+	}while(strcmp(debug_buf, "\n"));
 	printf("============================\n");
 #else
+
+	read_length = http_getline(sockfd, read_buf, sizeof(read_buf));
 	printf("release\n");
 
+	/* save http method  */
 	char method_buf[BUFSIZE];
+	/* save http url */
 	char url_buf[BUFSIZE];
+	/* save path */
 	char path_buf[BUFSIZE];
+
 	// 获取方法字段
 	int idx_buf = 0;
 	int idx_method = 0;
@@ -100,28 +115,154 @@ void* http_handler_request(void* new_sock)
 
 	method_buf[idx_method] = '\0';
 
+	/* only support GET and POST */
+	if (strcasecmp(method_buf, "GET") && strcasecmp(method_buf, "POST"))
+	{
+		state_code = 501;
+		goto end;
+	}
+
 	while(isspace(read_buf[idx_buf]) && idx_buf < sizeof(read_buf))
 	{
 		idx_buf++;
 	}
 	// 获取 URL 字段
 	int idx_url = 0;
-
 	while(!isspace(read_buf[idx_buf]) && idx_buf < sizeof(read_buf) && idx_url < sizeof(url_buf))
 	{
 		url_buf[idx_url] = read_buf[idx_buf];
 		idx_url++;
 		idx_buf++;
 	}
+
 	url_buf[idx_url] = '\0';
 
 	printf("METHOD : %s\n", method_buf);
 	printf("URL: %s\n", url_buf);
 
+
+	// 如果是POST 将 CGI 置为 1
+	if (strcasecmp(method_buf, "POST") == 0)
+		cgi = 1;
+
+	char* query_string = url_buf;
+	// 如果是 GET 并且有参数需要将 cgi 置 1
+	// 将路径和参数分割开
+	if (strcasecmp(method_buf, "GET") == 0)
+	{
+		while(*query_string != '\0' &&  *query_string != '?')
+			query_string++;
+		if(*query_string == '?')
+		{
+			cgi = 1;
+			*query_string = '\0';
+			 query_string++;
+		}
+	}
+
+
+	// 判断是否是访问路径，是的话重定向首页
+	sprintf(path_buf, "wwwroot%s", url_buf);
+	if ( path_buf[strlen(path_buf) -1] == '/')
+	{
+		// 我觉得用strcat 有bug 应该用 sprintf
+		// strcat(path_buf, "index.html");
+		sprintf(path_buf, "wwwroot/index.html");
+	}
+
+
+	struct stat file_stat;
+
+	if(stat(path_buf, &file_stat) < 0 )
+	{
+		state_code = 404;
+		goto end;
+	}
+	else
+	{
+		// 如果具有可执行权限，就将 CGI 置为1
+		if(file_stat.st_mode & S_IXUSR ||
+		   file_stat.st_mode & S_IXGRP ||
+		   file_stat.st_mode & S_IXOTH)
+			cgi = 1;
+
+		// 可执行就去fork-exec 执行 CGI 脚本
+		// 此时无需清空头部，因为需要获取长度，
+		// 如果是发送静态页面则需要,清空头部信息.
+		if (cgi)
+		{
+			if( http_execute_cgi(sockfd, path_buf, query_string) == 200)
+			{
+				printf("execute cgi ok..\n");
+				return NULL;
+			}
+		}
+		else
+		{
+			http_clear_head(sockfd);
+			if( http_send_html(sockfd, path_buf, file_stat.st_size) == 200)
+			{
+				printf("send html ok ..\n");
+				return NULL;
+			}
+		}
+	}
+
 end:
+	/* echo_error no handler */
+	http_clear_head(sockfd);
+	http_echo_error(sockfd, state_code);
 	close(sockfd);
+	return NULL;
 #endif
 }
 
+// 读取并丢弃头部
+void http_clear_head(int sockfd)
+{
+	char buf[BUFSIZE];
+	do
+	{
+		http_getline(sockfd,buf, sizeof(buf));
+	}while(strcmp("\n", buf));
+}
+
+void http_echo_error(int sockfd, int state)
+{
+	/// 待完成
+	switch(state)
+	{
+		case 404:
+			break;
+		case 501:
+			break;
+	}
+}
 
 
+int http_execute_cgi(int sockfd, const char* path, const char* query_string)
+{
+
+}
+int http_send_html(int sockfd, const char* path, int file_size)
+{
+
+	const char* str = "HTTP/1.0 200 OK\r\n\r\n";
+	send(sockfd, str, strlen(str), 0);
+	printf("html file path : %s\n",path);
+	int file_fd = open(path, O_RDONLY);
+	if( file_fd < 0)
+	{
+		perror("erron: open()");
+		return 404;
+	}
+
+	if(sendfile(sockfd, file_fd, 0, file_size) <0)
+	{
+		perror("error:sendfile()");
+		close(file_fd);
+		return 404;
+	}
+	close(file_fd);
+	return 200;
+}
