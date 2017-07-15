@@ -191,7 +191,7 @@ void* http_handler_request(void* new_sock)
 		// 如果是发送静态页面则需要,清空头部信息.
 		if (cgi)
 		{
-			if( http_execute_cgi(sockfd, path_buf, query_string) == 200)
+			if( http_execute_cgi(sockfd, method_buf,  path_buf, query_string) == 200)
 			{
 				printf("execute cgi ok..\n");
 				return NULL;
@@ -229,7 +229,6 @@ void http_clear_head(int sockfd)
 
 void http_echo_error(int sockfd, int state)
 {
-	/// 待完成
 	switch(state)
 	{
 		case 404:
@@ -240,15 +239,126 @@ void http_echo_error(int sockfd, int state)
 }
 
 
-int http_execute_cgi(int sockfd, const char* path, const char* query_string)
+int http_execute_cgi(int sockfd, const char* method, const char* path, const char* query_string)
 {
 
+	int content_len = -1;
+	if (strcasecmp(method, "GET") == 0)
+	{
+		http_clear_head(sockfd);
+	}
+	else
+	{
+		char buff[BUFSIZE];
+		int ret = -1;
+		do
+		{
+			http_getline(sockfd, buff, sizeof(buff));
+			if(strncasecmp(buff, "Content-Length: ", 16) == 0)
+			{
+				content_len = atoi(&buff[16]);
+			}
+		}while(strcmp(buff, "\n"));
+
+		if( content_len == -1)
+		{
+			return 401;
+		}
+		printf("Get content length successful\n");
+	}
+
+	printf("cgi: path: %s\n", path);
+	int cgi_input[2]; // father -->> child 
+	int cgi_output[2];// child  -->> father
+
+	if ( pipe(cgi_input) < 0)
+	{
+		perror("error:pipe()");
+		return 401;
+	}
+	if ( pipe(cgi_output) < 0)
+	{
+		perror("error:pipe()");
+		return 401;
+	}
+
+	pid_t pid = fork();
+	if (pid <  0)
+	{
+		perror("error:fork()");
+		return 401;
+	}
+	else if (pid == 0)
+	{//child
+		close(cgi_output[0]);
+		close(cgi_input[1]);
+
+		char METHOD[BUFSIZE];
+		char QUERY_STRING[BUFSIZE];
+		char CONTENT_LENGTH[BUFSIZE];
+
+		// 1. set method
+		sprintf(METHOD, "METHOD=%s", method);
+		putenv(METHOD);
+		// 2. judge GET ok POST
+		if ( strcasecmp(method, "GET") == 0)
+		{
+			sprintf(QUERY_STRING,"QUERY_STRING=%s", query_string);
+			putenv(QUERY_STRING);
+		}
+		else
+		{
+			sprintf(CONTENT_LENGTH, "CONTENT_LENGTH=%d", content_len);
+			putenv(CONTENT_LENGTH);
+		}
+		dup2(cgi_output[1],1);
+		dup2(cgi_input[0],0);
+		execl(path, path, NULL);
+		perror("error:execl()");
+		exit(ERROR_EXECL);
+	}
+
+	// father
+	close(cgi_output[1]);
+	close(cgi_input[0]);
+	const char* state = "HTTP/1.0 200 OK\r\n";
+	send(sockfd, state, strlen(state), 0);
+	const char* type = "Content-Type: text/html\r\n\r\n";
+	send(sockfd, type, strlen(type), 0);
+
+	int idx = 0;
+	char c;
+	for(; idx< content_len; idx++)
+	{
+		recv(sockfd,&c, 1, 0);
+		write(cgi_input[1],&c,1);
+	}
+
+	while(1)
+	{
+		if(read(cgi_output[0], &c, 1) > 0)
+		{
+			send(sockfd, &c, 1 ,0);
+		}
+		else
+		{
+			break;
+		}
+	}
+
+	waitpid(pid, NULL, 0);
+	close(cgi_output[0]);
+	close(cgi_input[1]);
 }
+
+
 int http_send_html(int sockfd, const char* path, int file_size)
 {
 
-	const char* str = "HTTP/1.0 200 OK\r\n\r\n";
-	send(sockfd, str, strlen(str), 0);
+	const char* state = "HTTP/1.0 200 OK\r\n";
+	send(sockfd, state, strlen(state), 0);
+	const char* type = "Content-Type: text/html\r\n\r\n";
+	send(sockfd, type, strlen(type), 0);
 	printf("html file path : %s\n",path);
 	int file_fd = open(path, O_RDONLY);
 	if( file_fd < 0)
