@@ -19,7 +19,6 @@ insert_cgi:insert_cgi.o sql.o
 
 %.o:%.cpp
 	$(CC) -c $<  -I$(INCLUDE)
-	
 
 .PHONY:clean
 clean:
