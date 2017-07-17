@@ -15,29 +15,17 @@ SqlConnector::SqlConnector(const std::string _user,
 	connector = mysql_init(NULL);
 }
 
-void SqlConnector::connect()
+bool SqlConnector::connect()
 {
-
-	cout << "----------------" << endl;
-	cerr << "user:" << user << endl;
-	cerr << "ip:" << ip << endl;
-	cerr << "passwd:" << passwd << endl;
-	cerr << "port:" << port << endl;
-	cerr << "db:" << db << endl;
-	cout << "----------------" << endl;
 	if(mysql_real_connect(connector, ip.c_str(),\
 				         user.c_str(), passwd.c_str(),\
 						 db.c_str(), port, NULL, 0))
-	{
-		cerr << "connect successful" <<endl;
-	}
-	else
-	{
-		cerr << "connect faild" << endl;
-	}
+		return true;
+
+	return false;
 }
 
-void SqlConnector::insert(const std::string& name, 
+bool SqlConnector::insert(const std::string& name, 
 			 				  const std::string& sex,
 			   				  const std::string& hobby,
 			   				  const std::string& school)
@@ -54,26 +42,49 @@ void SqlConnector::insert(const std::string& name,
 	insert += "')";
 
 	if( mysql_query(connector, insert.c_str()))
-		std::cerr << "insert faild" << std::endl;
-	else
-	{
-		std::cerr << "insert success" << std::endl;
-	}
+		return false;
+	return true;
 }
 
 
-void SqlConnector::select()
+bool SqlConnector::select()
 {
 	std::string select("select * from student");
 
 	if( mysql_query( connector, select.c_str()) == 0)
 	{
-		cerr << "------select success------" << endl;
+		MYSQL_RES *res = mysql_store_result(connector);
+
+		if(res)
+		{
+			// get the row of the query result
+			int rows = mysql_num_rows(res);
+			//get the field of the query result 
+			int fields = mysql_num_fields(res);
+			MYSQL_FIELD *fd = NULL;
+
+			// get the name of the field
+			for(; fd = mysql_fetch_field(res); )
+			{
+				cout << fd->name << "--";
+			}
+
+			cout << "<br>";
+			// print row and field 
+			int i = 0;
+			for (; i < rows; ++i)
+			{
+				MYSQL_ROW row = mysql_fetch_row(res);
+				int j = 0;
+				for(; j < fields; j++)
+					cout << row[j] << "--";
+
+				cout << "<br>";
+			}
+			return true;
+		}
 	}
-	else
-	{
-		cerr << "------select fail  -------" << endl;
-	}
+	return false;
 }
 
 

@@ -14,10 +14,10 @@ public:
 				 const int& _port=3306);
 
 	~SqlConnector();
-	void connect();
-	void select();
+	bool connect();
+	bool select();
 
-	void insert(const std::string& name,
+	bool insert(const std::string& name,
 			    const std::string& sex,
 				const std::string& hobby,
 				const std::string& school);
