@@ -44,7 +44,6 @@ clean:
 output:
 	@mkdir -p output/wwwroot/cgi-bin
 	@cp -rf conf          output
-	@cp -rf log           output
 	@cp wwwroot/*.html    output/wwwroot
 	@cp sql/select_cgi    output/wwwroot/cgi-bin
 	@cp sql/insert_cgi    output/wwwroot/cgi-bin
