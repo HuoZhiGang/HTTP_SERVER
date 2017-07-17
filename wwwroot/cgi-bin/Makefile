@@ -1,5 +1,5 @@
-hello_cgi:hello_cgi.cpp
-	g++ -o $@ $^
+math_cgi:math_cgi.cpp
+	@g++ -o $@ $^
 .PHONY:clean
 clean:
-	rm -rf hello_cgi
+	@rm -rf math_cgi
