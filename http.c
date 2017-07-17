@@ -321,10 +321,6 @@ int http_execute_cgi(int sockfd, const char* method, const char* path, const cha
 	// father
 	close(cgi_output[1]);
 	close(cgi_input[0]);
-	const char* state = "HTTP/1.0 200 OK\r\n";
-	send(sockfd, state, strlen(state), 0);
-	const char* type = "Content-Type: text/html\r\n\r\n";
-	send(sockfd, type, strlen(type), 0);
 
 	int idx = 0;
 	char c;
