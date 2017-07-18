@@ -160,6 +160,11 @@ void* http_handler_request(void* new_sock)
 		}
 	}
 
+	printf("----------------\n");
+	printf("url_buf :%s\n", url_buf);
+	printf("----------------\n");
+	printf("query_string:%s\n", query_string);
+	printf("----------------\n");
 
 	// 判断是否是访问路径，是的话重定向首页
 	sprintf(path_buf, "wwwroot%s", url_buf);
@@ -191,26 +196,27 @@ void* http_handler_request(void* new_sock)
 		// 如果是发送静态页面则需要,清空头部信息.
 		if (cgi)
 		{
-			if( http_execute_cgi(sockfd, method_buf,  path_buf, query_string) == 200)
+			state_code = http_execute_cgi(sockfd, method_buf,  path_buf, query_string);
+			if( state_code == 200)
 			{
 				printf("execute cgi ok..\n");
-				return NULL;
 			}
 		}
 		else
 		{
 			http_clear_head(sockfd);
-			if( http_send_html(sockfd, path_buf, file_stat.st_size) == 200)
+			state_code = http_send_html(sockfd, path_buf, file_stat.st_size);
+			if( state_code == 200)
 			{
 				printf("send html ok ..\n");
-				return NULL;
 			}
 		}
 	}
 
 end:
 	/* echo_error no handler */
-	http_clear_head(sockfd);
+	if( state_code != 200)
+		http_clear_head(sockfd);
 	http_echo_error(sockfd, state_code);
 	close(sockfd);
 	return NULL;
@@ -268,9 +274,6 @@ void http_echo_error(int sockfd, int state)
 			break;
 		case 501:
 			http_echo_501(sockfd);
-			break;
-		default:
-			http_echo_404(sockfd);
 			break;
 	}
 }
@@ -382,6 +385,7 @@ int http_execute_cgi(int sockfd, const char* method, const char* path, const cha
 	waitpid(pid, NULL, 0);
 	close(cgi_output[0]);
 	close(cgi_input[1]);
+	return 200;
 }
 
 
