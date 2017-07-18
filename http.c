@@ -165,7 +165,7 @@ void* http_handler_request(void* new_sock)
 	sprintf(path_buf, "wwwroot%s", url_buf);
 	if ( path_buf[strlen(path_buf) -1] == '/')
 	{
-		// 我觉得用strcat 有bug 应该用 sprintf
+		// 用strcat 有bug 应该用 sprintf
 		// strcat(path_buf, "index.html");
 		sprintf(path_buf, "wwwroot/index.html");
 	}
@@ -350,9 +350,9 @@ int http_execute_cgi(int sockfd, const char* method, const char* path, const cha
 		}
 		dup2(cgi_output[1],1);
 		dup2(cgi_input[0],0);
-		execl(path, path, NULL);
+		execl(path,  NULL);
 		perror("error:execl()");
-		exit(ERROR_EXECL);
+		exit(ERROR_EXECUTE);
 	}
 
 	// father
