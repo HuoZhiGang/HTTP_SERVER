@@ -227,13 +227,50 @@ void http_clear_head(int sockfd)
 	}while(strcmp("\n", buf));
 }
 
+
+void http_echo_404(int sockfd)
+{
+	const char* stat = "HTTP/1.0 404 NOT FOUND \r\n";
+	send(sockfd, stat, strlen(stat), 0);
+	const char* type = "ContentType: text/html\r\n\r\n";
+	send(sockfd, type, strlen(type), 0);
+	const char* html = "<HTML><title>404 not found</title><h1>404 ERRON</h1></HTML>";
+	send(sockfd, html, strlen(html), 0);
+}
+
+void http_echo_403(int sockfd)
+{
+	const char* stat = "HTTP/1.0 403 Forbidden \r\n";
+	send(sockfd, stat, strlen(stat), 0);
+	const char* type = "ContentType: text/html\r\n\r\n";
+	send(sockfd, type, strlen(type), 0);
+	const char* html = "<HTML><title>401 forbidden</title><h1>403 forbidden</h1></HTML>";
+	send(sockfd, html, strlen(html), 0);
+}
+void http_echo_501(int sockfd)
+{
+	const char* stat = "HTTP/1.0 501 Unavailable \r\n";
+	send(sockfd, stat, strlen(stat), 0);
+	const char* type = "ContentType: text/html\r\n\r\n";
+	send(sockfd, type, strlen(type), 0);
+	const char* html = "<HTML><title>501 Unavailable</title><h1>501 Unavailable</h1></HTML>";
+	send(sockfd, html, strlen(html), 0);
+}
 void http_echo_error(int sockfd, int state)
 {
 	switch(state)
 	{
 		case 404:
+			http_echo_404(sockfd);
+			break;
+		case 403:
+			http_echo_403(sockfd);
 			break;
 		case 501:
+			http_echo_501(sockfd);
+			break;
+		default:
+			http_echo_404(sockfd);
 			break;
 	}
 }
@@ -262,7 +299,7 @@ int http_execute_cgi(int sockfd, const char* method, const char* path, const cha
 
 		if( content_len == -1)
 		{
-			return 401;
+			return 403;
 		}
 		printf("Get content length successful\n");
 	}
@@ -274,19 +311,19 @@ int http_execute_cgi(int sockfd, const char* method, const char* path, const cha
 	if ( pipe(cgi_input) < 0)
 	{
 		perror("error:pipe()");
-		return 401;
+		return 403;
 	}
 	if ( pipe(cgi_output) < 0)
 	{
 		perror("error:pipe()");
-		return 401;
+		return 403;
 	}
 
 	pid_t pid = fork();
 	if (pid <  0)
 	{
 		perror("error:fork()");
-		return 401;
+		return 403;
 	}
 	else if (pid == 0)
 	{//child
