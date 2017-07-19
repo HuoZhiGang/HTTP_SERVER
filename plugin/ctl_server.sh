@@ -12,7 +12,7 @@ id=""
 
 function usage()
 {
-	printf "Usage: %s [start(-s) | stop(-t) | restart(-rt) | status(-ss) ]\n" "$proc"
+	printf "Usage: %s [start(-s) | stop(-t) | restart(-rt) | status(-ss) | daemon(-d)]\n" "$proc"
 }
 
 function server_status()
@@ -31,7 +31,11 @@ function server_start()
 	if ! server_status; then
 		ip=$(awk -F: '/^IP/{print $NF}' $CONF)
 		port=$(awk -F: '/^PORT/{print $NF}' $CONF)
-		$BIN $ip $port
+		if [ "X$1" = "Xd" ]; then
+			$BIN $ip $port d
+		else
+			$BIN $ip $port
+		fi
 		if [ $? -eq 0 ] ;then
 		    echo "Start ... done"
 		else
@@ -89,6 +93,9 @@ case $1 in
 		;;
 	status | -ss )
 		service_status
+		;;
+	daemon | -d )
+		server_start d
 		;;
 	* )
 		usage;
