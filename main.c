@@ -4,18 +4,22 @@
 
 static void http_usage(const char* proc)
 {
-	printf("Usage:%s [server_ip] [ server_Port]\n");
+	printf("Usage:%s [server_ip] [ server_Port] [d]\n");
 }
 
 int main(int argc, char*argv[])
 {
-	if( argc != 3)
+	if( argc != 3 && argc != 4)
 	{
 		http_usage(argv[0]);
 		return ERROR_USE;
 	}
 
 	int listen_sock = http_startup(argv[1], atoi(argv[2]));
+	if( argc == 4 && strcmp(argv[3], "d") == 0)
+	{
+		daemon(1, 0);
+	}
 
 
 	while(1)
