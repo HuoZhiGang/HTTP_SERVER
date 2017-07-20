@@ -10,6 +10,7 @@ static void http_usage(const char* proc)
 
 int main(int argc, char*argv[])
 {
+	signal(SIGPIPE,SIG_IGN);
 	if( argc != 3 && argc != 4)
 	{
 		http_usage(argv[0]);
@@ -20,7 +21,7 @@ int main(int argc, char*argv[])
 	int listen_sock = http_startup(argv[1], atoi(argv[2]));
 	if( argc == 4 && strcmp(argv[3], "d") == 0)
 	{
-		daemon(1, 0);
+		daemon(0, 0);
 	}
 
 
