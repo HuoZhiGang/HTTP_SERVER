@@ -1,4 +1,5 @@
 #include "http.h"
+#include "thread_poll.h"
 
 
 
@@ -15,6 +16,7 @@ int main(int argc, char*argv[])
 		return ERROR_USE;
 	}
 
+	pool_init(5);
 	int listen_sock = http_startup(argv[1], atoi(argv[2]));
 	if( argc == 4 && strcmp(argv[3], "d") == 0)
 	{
@@ -33,10 +35,10 @@ int main(int argc, char*argv[])
 			perror("error:accept()");
 			continue;
 		}
-
-		pthread_t tid;
-		pthread_create(&tid, NULL, http_handler_request, (void*)new_sock);
-		pthread_detach(tid);
+		pool_add_worker(http_handler_request, (void*)new_sock);  
+		//pthread_t tid;
+		//pthread_create(&tid, NULL, http_handler_request, (void*)new_sock);
+		//pthread_detach(tid);
 
 	}
 
